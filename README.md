@@ -266,8 +266,7 @@ If you use this tool in your research, please cite:
 
 ## 📞 Support
 
-- **Documentation**: Check the [User Guide](docs/user_guide.md)
-- **Issues**: [GitHub Issues](https://github.com/puppalasaisrikar/colorectal-cancer-screening-tool/issues)
+- **Documentation**: Check the [User Guide](user_guide.md)
 - **Email**: srikarsai.puppala@gmail.com
 
 ---
