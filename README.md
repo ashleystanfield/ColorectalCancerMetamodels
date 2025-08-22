@@ -266,7 +266,7 @@ If you use this tool in your research, please cite:
 
 ## 📞 Support
 
-- **Documentation**: Check the [User Guide](user_guide.md)
+- **Documentation**: Check the [User Guide](user_guide.md) & [Technical Documentation](technical_documentation.md)
 - **Email**: srikarsai.puppala@gmail.com
 
 ---
