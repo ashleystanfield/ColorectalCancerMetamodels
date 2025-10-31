@@ -1,568 +1,1083 @@
-# Technical Documentation: Metamodel Decision Tool
+# Technical Documentation
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
-2. [Data Model](#data-model)
-3. [Machine Learning Implementation](#machine-learning-implementation)
-4. [Algorithm Specifications](#algorithm-specifications)
-5. [Function Reference](#function-reference)
-6. [Performance Optimization](#performance-optimization)
-7. [Validation Framework](#validation-framework)
-8. [Customization Guide](#customization-guide)
+2. [Data Structures](#data-structures)
+3. [Machine Learning Models](#machine-learning-models)
+4. [Core Algorithms](#core-algorithms)
+5. [Demographic Weighting System](#demographic-weighting-system)
+6. [Validation Logic](#validation-logic)
+7. [Performance Optimization](#performance-optimization)
+8. [API Reference](#api-reference)
+9. [Database Schema](#database-schema)
+10. [Deployment Guide](#deployment-guide)
+
+---
 
 ## Architecture Overview
 
-### System Design
+### Application Structure
+
+The application follows a modular Shiny architecture with clear separation of concerns:
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Shiny Application Layer                      │
-├─────────────────────────────────────────────────────────────────┤
-│  UI Components          │  Server Logic                         │
-│  ├── Global Config      │  ├── Reactive Values                  │
-│  ├── Scenario Panels    │  ├── Model Training                   │
-│  ├── Results Display    │  ├── Prediction Engine                │
-│  └── Download Handler   │  └── Validation Logic                 │
-├─────────────────────────────────────────────────────────────────┤
-│                    Data Processing Layer                        │
-│  ├── CSV Parsing        │  ├── Demographic Mapping              │
-│  ├── Data Validation    │  ├── Weight Calculation               │
-│  └── Format Transform   │  └── Result Aggregation               │
-├─────────────────────────────────────────────────────────────────┤
-│                 Machine Learning Layer                         │
-│  ├── Model Factory      │  ├── Training Pipeline                │
-│  ├── Prediction Engine  │  ├── Model Caching                    │
-│  └── Error Handling     │  └── Performance Monitoring           │
-├─────────────────────────────────────────────────────────────────┤
-│                      Data Storage Layer                        │
-│  ├── Training Data      │  ├── Model Cache                      │
-│  ├── Mapping Tables     │  └── Results Storage                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│           User Interface (UI)           │
+│  ┌─────────────────────────────────┐   │
+│  │  Single Population Mode         │   │
+│  │  Multi-Population Mode          │   │
+│  │  Results Visualization          │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│         Server Logic (Server)           │
+│  ┌─────────────────────────────────┐   │
+│  │  Reactive Values Management     │   │
+│  │  Event Handlers                 │   │
+│  │  Computation Engine             │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│        Core Functions Layer             │
+│  ┌─────────────────────────────────┐   │
+│  │  Data Preparation               │   │
+│  │  Model Training                 │   │
+│  │  Prediction Generation          │   │
+│  │  Validation Functions           │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────┐
+│           Data Layer                    │
+│  ┌─────────────────────────────────┐   │
+│  │  Training Data (CSV)            │   │
+│  │  Pre-computed Models (RDS)      │   │
+│  │  Model Cache                    │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
-### Core Technologies
-- **Frontend**: Shiny UI with shinyBS for enhanced components
-- **Backend**: R with reactive programming paradigm
-- **ML Framework**: caret package with multiple algorithm backends
-- **Data Processing**: tidyverse ecosystem (dplyr, tidyr, purrr)
-- **Validation**: Custom parameter validation framework
+### Key Components
 
-## Data Model
+#### 1. UI Layer
+- **Global Configuration Panel**: Manages population-wide settings
+- **Scenario Configuration**: Dynamic UI generation for multiple scenarios
+- **Demographics Panel**: Collapsible demographic input controls
+- **Results Display**: DataTables for interactive result viewing
+- **Multi-Population Interface**: Recursive panel generation for sub-populations
 
-### Input Data Structure
+#### 2. Server Layer
+- **Reactive Values**: State management for scenarios, demographics, and results
+- **Event Handlers**: Button clicks, input changes, validation triggers
+- **Progress Tracking**: Modal dialogs and progress indicators
+- **Download Handlers**: CSV export with comprehensive data
 
-#### Training Data Format
-Each CSV file contains:
+#### 3. Core Functions Layer
+- **Data Preparation**: CSV loading, transformation, and reshaping
+- **Model Training**: 180 separate models per outcome type (540 total)
+- **Prediction Engine**: Weighted prediction aggregation
+- **Validation**: Parameter validation and constraint checking
+
+---
+
+## Data Structures
+
+### Input Data Format
+
+#### Training Data Files
+Each training data file contains:
+- **Rows**: Different screening parameter combinations
+- **Columns**: 9 input parameters + 180 person-specific outcomes
+
 ```
-Row Structure: [FIT_before, FIT_during, FIT_after, COLON_before, COLON_during, 
-               COLON_after, DIAG_before, DIAG_during, DIAG_after, P_1, P_2, ..., P_180]
+Structure:
+[FIT_before] [FIT_during] [FIT_after] [COLON_before] [COLON_during] [COLON_after] 
+[DIAG_before] [DIAG_during] [DIAG_after] [P_1] [P_2] ... [P_180]
 ```
 
-#### Person-Type Mapping
+#### Long Format Transformation
 ```r
-create_mapping_df <- function() {
-  genders <- c("male", "female")                    # 2 categories
-  races <- c("white", "black", "other")            # 3 categories  
-  ages <- c("45-49", "50-54", "55-59", 
-            "60-64", "65-69", "70-74")             # 6 categories
-  
-  # Total combinations: 2 × 3 × 6 = 36 unique profiles
-  # Replicated 5 times: 36 × 5 = 180 person-types
-}
+# Original: Wide format
+# FIT_before, FIT_during, ..., P_1, P_2, ..., P_180
+
+# Transformed: Long format
+# FIT_before, FIT_during, ..., Person, Outcome
+# 8, 10, 9, ..., P_1, 45.2
+# 8, 10, 9, ..., P_2, 42.1
 ```
 
-### Data Flow Pipeline
+### Mapping DataFrame
 
-#### 1. Data Ingestion
+The `mapping_df` creates a systematic mapping of 180 persons to demographic groups:
+
 ```r
-data_prep <- function(file_path, outcome_name) {
-  # Read CSV with proper column structure
-  # Transform wide to long format
-  # Add row identifiers
-  # Return structured data frame
-}
-```
-
-#### 2. Demographic Weighting
-```r
-compute_demographic_weights <- function(scenario_inputs) {
-  # Calculate population weights for each of 180 person-types
-  # Based on user-specified demographic distributions
-  # Returns weight vector for prediction aggregation
-}
-```
-
-#### 3. Prediction Aggregation
-```r
-predict_total <- function(models) {
-  # Generate predictions for all 180 person-types
-  # Apply demographic weights
-  # Sum to population-level estimate
-}
-```
-
-## Machine Learning Implementation
-
-### Model Training Architecture
-
-#### Training Pipeline
-```r
-train_models_with_progress <- function(data, model_type) {
-  # 1. Check model cache for existing trained models
-  # 2. Initialize progress tracking
-  # 3. Train models for each outcome (CCA, LYL, CD)
-  # 4. Cache results for future use
-  # 5. Return trained model objects
-}
-```
-
-#### Individual Model Training
-```r
-train_[model]_models <- function(data, outcome, progress_callback) {
-  # For each of 180 person-types:
-  #   1. Extract person-specific data
-  #   2. Validate sufficient data points
-  #   3. Train model with cross-validation
-  #   4. Store model or create dummy fallback
-  #   5. Update progress indicator
-}
-```
-
-### Model Specifications
-
-#### Linear Regression
-```r
-# Implementation: Base R lm()
-# Formula: outcome ~ FIT_before + FIT_during + FIT_after + 
-#                   COLON_before + COLON_during + COLON_after + 
-#                   DIAG_before + DIAG_during + DIAG_after
-# Minimum data: 5 observations per person-type
-# Training time: ~15 seconds
-```
-
-#### Decision Tree
-```r
-# Implementation: caret with rpart method
-# Cross-validation: 3-fold CV
-# Tuning: tuneLength = 3
-# Minimum data: 10 observations per person-type
-# Training time: ~45 seconds
-```
-
-#### Random Forest
-```r
-# Implementation: caret with rf method
-# Trees: ntree = 50 (optimized for speed)
-# Cross-validation: 3-fold CV
-# Tuning: tuneLength = 2
-# Minimum data: 15 observations per person-type
-# Training time: ~90 seconds
-```
-
-#### Support Vector Regression
-```r
-# Implementation: caret with svmRadial method
-# Kernel: Radial basis function
-# Cross-validation: 3-fold CV
-# Tuning: tuneLength = 2
-# Minimum data: 20 observations per person-type
-# Training time: ~120 seconds
-```
-
-#### Lasso Regression
-```r
-# Implementation: caret with glmnet method
-# Alpha: 1 (pure Lasso)
-# Lambda grid: 10^seq(-3, 0, length = 5)
-# Cross-validation: 3-fold CV
-# Minimum data: 10 observations per person-type
-# Training time: ~60 seconds
-```
-
-#### Ridge Regression
-```r
-# Implementation: caret with glmnet method
-# Alpha: 0 (pure Ridge)
-# Lambda grid: 10^seq(-3, 0, length = 5)
-# Cross-validation: 3-fold CV
-# Minimum data: 10 observations per person-type
-# Training time: ~50 seconds
-```
-
-## Algorithm Specifications
-
-### Prediction Algorithm
-```r
-Algorithm: Population-Level Outcome Prediction
-Input: Trained models (M), Scenario parameters (P), Demographic weights (W)
-Output: Aggregated outcome predictions
-
-1. FOR each person-type i in [1, 180]:
-   a. Extract model Mi for current outcome
-   b. Generate prediction Pi using parameters P
-   c. Apply demographic weight Wi
-   
-2. Aggregate: Total = Σ(Pi × Wi) for i in [1, 180]
-
-3. Return rounded total outcome
-```
-
-### Caching Algorithm
-```r
-Algorithm: Model Cache Management
-Input: Model type (T), Data digest (D)
-Output: Cached or newly trained models
-
-1. Generate cache key: K = hash(T, D)
-2. IF cache contains key K:
-   a. Return cached models
-3. ELSE:
-   a. Train new models
-   b. Store in cache with key K
-   c. Return trained models
-```
-
-### Validation Algorithm
-```r
-Algorithm: Parameter Validation
-Input: Before (B), During (D), After (A) parameters for each screening type
-Output: Validation errors or success
-
-FOR each screening type (FIT, COLON, DIAG):
-  1. Check: B < D (Before less than During)
-  2. Check: A < D (After less than During)  
-  3. Check: B < A (Before less than After)
-  4. Collect any violations
-
-Return: List of validation errors (empty if valid)
-```
-
-## Function Reference
-
-### Core Data Functions
-
-#### `data_prep(file_path, outcome_name)`
-**Purpose**: Load and transform training data
-**Parameters**:
-- `file_path`: Path to CSV training file
-- `outcome_name`: Name for outcome column ("CCA", "LYL", "CD")
-**Returns**: Long-format data frame with person-type structure
-
-#### `create_mapping_df()`
-**Purpose**: Generate demographic mapping table
-**Parameters**: None
-**Returns**: Data frame mapping person-types to demographic characteristics
-
-#### `compute_demographic_weights(scenario_inputs)`
-**Purpose**: Calculate population weights for demographic aggregation
-**Parameters**: 
-- `scenario_inputs`: List containing demographic percentages
-**Returns**: Vector of 180 weights for person-types
-
-### Validation Functions
-
-#### `validate_screening_parameters(...)`
-**Purpose**: Validate screening parameter logical consistency
-**Parameters**: All 9 screening parameters (before/during/after for each type)
-**Returns**: Vector of validation error messages (empty if valid)
-
-#### `get_age_group(age)`
-**Purpose**: Convert numeric age to age group category
-**Parameters**: 
-- `age`: Numeric age value
-**Returns**: Factor with age group category
-
-### Model Training Functions
-
-#### `train_[model]_models(data, outcome, progress_callback)`
-**Purpose**: Train specific model type for all person-types
-**Parameters**:
-- `data`: Training data for specific outcome
-- `outcome`: Outcome name ("CCA", "LYL", "CD")
-- `progress_callback`: Function for progress updates
-**Returns**: List of 180 trained models
-
-#### `safe_model_predict(model, newdata)`
-**Purpose**: Robust prediction with error handling
-**Parameters**:
-- `model`: Trained model object
-- `newdata`: Data frame with prediction inputs
-**Returns**: Numeric prediction (0 if error)
-
-### Utility Functions
-
-#### `get_estimated_time(model_type, data_size)`
-**Purpose**: Estimate model training time
-**Parameters**:
-- `model_type`: String identifying model algorithm
-- `data_size`: Number of training observations
-**Returns**: Human-readable time estimate
-
-#### `create_dummy_model(method)`
-**Purpose**: Generate fallback model for insufficient data
-**Parameters**:
-- `method`: Model type identifier
-**Returns**: Dummy model object with predict capability
-
-## Performance Optimization
-
-### Computational Complexity
-
-#### Training Complexity
-| Model | Time Complexity | Space Complexity | Scalability |
-|-------|-----------------|------------------|-------------|
-| Linear Regression | O(p³) | O(p²) | Excellent |
-| Decision Tree | O(n log n × p) | O(n) | Good |
-| Random Forest | O(k × n log n × p) | O(k × n) | Moderate |
-| SVR | O(n³) | O(n²) | Poor |
-| Lasso/Ridge | O(n × p²) | O(p²) | Good |
-
-Where: n = observations, p = parameters, k = trees
-
-#### Memory Management
-```r
-# Model caching reduces memory usage through:
-# 1. Shared model objects across scenarios
-# 2. Lazy loading of training data
-# 3. Garbage collection after training
-# 4. Efficient reactive invalidation
-```
-
-### Performance Monitoring
-
-#### Training Time Estimation
-```r
-base_times <- list(
-  "Linear Regression" = 15,     # seconds
-  "Decision Tree" = 45,
-  "Random Forest" = 90,
-  "Support Vector Regression" = 120,
-  "Lasso Regression" = 60,
-  "Ridge Regression" = 50
+mapping_df <- expand.grid(
+  Gender = c("male", "female"),           # 2 categories
+  Race = c("white", "black", "other"),    # 3 categories
+  AgeGroup = c("45-49", "50-54", "55-59", # 6 categories
+               "60-64", "65-69", "70-74")
 )
-
-# Adjusted for data size and system performance
-estimated_time = base_time × (data_size / 1000) × system_multiplier
+# Total: 2 × 3 × 6 = 36 combinations
+# Each combination assigned 5 persons (180 / 36 = 5)
 ```
 
-#### Cache Hit Optimization
-```r
-# Cache key generation:
-cache_key <- paste(model_type, digest::digest(data), sep = "_")
+### Results Data Structure
 
-# Cache hit rate optimization:
-# - Identical scenarios reuse cached models
-# - Data preprocessing standardization
-# - Deterministic random seeds
+```r
+results_list <- list(
+  baseline = list(
+    cca = numeric,              # Cancer cases
+    lyl = numeric,              # Life years lost
+    cd = numeric,               # Cancer deaths
+    model_type = character,     # ML model used
+    total_pop = numeric,        # Population size
+    scenario_name = character,  # Scenario identifier
+    parameters = list(          # All input parameters
+      total_pop, male_pct, female_pct,
+      white_pct, black_pct, other_pct,
+      age_45_49, age_50_54, age_55_59,
+      age_60_64, age_65_69, age_70_74,
+      fit_before, fit_during, fit_after,
+      colon_before, colon_during, colon_after,
+      diag_before, diag_during, diag_after,
+      model_type
+    )
+  ),
+  scenario_1 = list(...),
+  scenario_2 = list(...),
+  ...
+)
 ```
 
-## Validation Framework
+---
 
-### Parameter Validation Rules
+## Machine Learning Models
 
-#### Screening Rate Constraints
+### Model Implementation Details
+
+#### 1. Linear Regression
 ```r
-# For each screening type (FIT, COLON, DIAG):
-Before_Rate < During_Rate    # Pandemic increases screening
-After_Rate < During_Rate     # Recovery reduces from peak
-Before_Rate < After_Rate     # Recovery exceeds pre-pandemic
-
-# Numeric constraints:
-FIT: [0, 30]           # Percentage bounds
-COLON: [30, 70]        # Realistic colonoscopy rates
-DIAG: [0, 90]          # Diagnostic procedure rates
+train_lm_models <- function(data, outcome, progress_callback = NULL)
+  Formula: outcome ~ FIT_before + FIT_during + FIT_after + 
+                     COLON_before + COLON_during + COLON_after + 
+                     DIAG_before + DIAG_during + DIAG_after
+  Method: lm()
+  Minimum data points: 5
+  Training time: ~15 seconds per outcome type
 ```
 
-#### Demographic Validation
-```r
-# Percentage sum validation:
-male_pct + female_pct = 100
-white_pct + black_pct + other_pct = 100
-sum(all_age_group_pcts) = 100
+**Advantages**: 
+- Fastest training and prediction
+- Interpretable coefficients
+- Low computational requirements
 
-# Individual bounds:
-All percentages: [0, 100]
-Population size: >= 1000
+**Limitations**: 
+- Assumes linear relationships
+- No interaction terms
+
+#### 2. Decision Tree (CART)
+```r
+train_tree_models <- function(data, outcome, progress_callback = NULL)
+  Method: caret::train with method = "rpart"
+  Hyperparameters: tuneLength = 3
+  Cross-validation: 3-fold CV
+  Minimum data points: 10
+  Training time: ~45 seconds per outcome type
 ```
 
-#### Data Quality Validation
-```r
-# Training data requirements:
-minimum_observations_per_person_type = 5   # For linear models
-minimum_observations_per_person_type = 20  # For SVR
+**Advantages**: 
+- Handles non-linear relationships
+- Automatic feature interaction detection
+- Robust to outliers
 
-# Missing data handling:
-if (insufficient_data) {
-  use_dummy_model()
-} else {
-  train_actual_model()
-}
+**Limitations**: 
+- Can overfit without proper tuning
+- High variance
+
+#### 3. Random Forest
+```r
+train_rf_models <- function(data, outcome, progress_callback = NULL)
+  Method: caret::train with method = "rf"
+  Parameters: ntree = 50, tuneLength = 2
+  Cross-validation: 3-fold CV
+  Minimum data points: 15
+  Training time: ~90 seconds per outcome type
 ```
 
-### Error Handling Strategy
+**Advantages**: 
+- Excellent prediction accuracy
+- Handles non-linearity and interactions
+- Reduces overfitting through ensemble
 
-#### Graceful Degradation
+**Limitations**: 
+- Computationally intensive
+- Less interpretable
+- Longer training time
+
+#### 4. Support Vector Regression (SVR)
 ```r
-# Model training failure hierarchy:
-1. Try requested model with full data
-2. If insufficient data → use dummy model
-3. If training fails → fallback to simpler model
-4. If all fails → return zero prediction with warning
+train_svr_models <- function(data, outcome, progress_callback = NULL)
+  Method: caret::train with method = "svmRadial"
+  Kernel: Radial basis function (RBF)
+  Hyperparameters: tuneLength = 2
+  Cross-validation: 3-fold CV
+  Minimum data points: 20
+  Training time: ~120 seconds per outcome type
 ```
 
-#### User Feedback
+**Advantages**: 
+- Handles high-dimensional data
+- Effective with non-linear patterns
+- Good generalization
+
+**Limitations**: 
+- Computationally expensive
+- Sensitive to parameter tuning
+- Requires more training data
+
+#### 5. Lasso Regression (L1 Regularization)
 ```r
-# Validation feedback levels:
-Error: Blocks execution, requires user correction
-Warning: Allows execution, notifies potential issues  
-Info: Provides guidance, no intervention required
-Success: Confirms valid configuration
+train_lasso_models <- function(data, outcome, progress_callback = NULL)
+  Method: caret::train with method = "glmnet"
+  Alpha: 1 (pure Lasso)
+  Lambda grid: 10^seq(-3, 0, length = 5)
+  Cross-validation: 3-fold CV
+  Minimum data points: 10
+  Training time: ~60 seconds per outcome type
 ```
 
-## Customization Guide
+**Advantages**: 
+- Automatic feature selection
+- Prevents overfitting
+- Handles multicollinearity
 
-### Adding New Models
+**Limitations**: 
+- Assumes linear relationships
+- May underfit if regularization too strong
 
-#### 1. Create Training Function
+#### 6. Ridge Regression (L2 Regularization)
 ```r
-train_newmodel_models <- function(data, outcome, progress_callback = NULL) {
-  models <- list()
-  total_persons <- 180
-  
-  for (i in 1:total_persons) {
-    person <- paste0("P_", i)
-    tryCatch({
-      person_data <- data %>% filter(Person == person)
-      
-      if (nrow(person_data) > minimum_required) {
-        # Implement your model training here
-        models[[person]] <- train_your_model(person_data)
-      } else {
-        models[[person]] <- create_dummy_model("your_method")
-      }
-    }, error = function(e) {
-      models[[person]] <- create_dummy_model("your_method")
-    })
-    
-    if (!is.null(progress_callback)) {
-      progress_callback(i / total_persons, paste("Training person", i))
-    }
-  }
-  return(models)
-}
+train_ridge_models <- function(data, outcome, progress_callback = NULL)
+  Method: caret::train with method = "glmnet"
+  Alpha: 0 (pure Ridge)
+  Lambda grid: 10^seq(-3, 0, length = 5)
+  Cross-validation: 3-fold CV
+  Minimum data points: 10
+  Training time: ~50 seconds per outcome type
 ```
 
-#### 2. Update Model Selection
-```r
-# In UI:
-selectInput("global_model_type", "Model Type:",
-            choices = c("Linear Regression",
-                       "Decision Tree", 
-                       "Random Forest",
-                       "Support Vector Regression",
-                       "Lasso Regression",
-                       "Ridge Regression",
-                       "Your New Model"),    # Add here
-            selected = "Linear Regression")
+**Advantages**: 
+- Handles multicollinearity
+- Stable predictions
+- All features retained
 
-# In Server:
-your_new_models <- switch(model_type,
-                         "Your New Model" = train_newmodel_models(data$cca, "CCA", progress_callback),
-                         # ... existing models
-                         )
+**Limitations**: 
+- Assumes linear relationships
+- No feature selection
+
+### Model Training Pipeline
+
+```r
+# For each outcome type (CCA, LYL, CD):
+#   For each person (P_1 to P_180):
+#     1. Filter data for specific person
+#     2. Check minimum data requirement
+#     3. Train model with cross-validation
+#     4. Store model or create dummy fallback
+#     5. Update progress callback
+
+# Total models per analysis:
+# 3 outcome types × 180 persons = 540 models
 ```
 
-### Modifying Demographic Categories
+### Pre-computed Model Caching
 
-#### 1. Update Mapping Function
+To improve performance, models can be pre-computed and saved:
+
 ```r
-create_mapping_df <- function() {
-  # Modify these vectors for new categories:
-  genders <- c("male", "female", "other")           # Add gender categories
-  races <- c("white", "black", "hispanic", "asian", "other")  # Add race categories
-  ages <- c("40-44", "45-49", "50-54", "55-59",    # Modify age ranges
-            "60-64", "65-69", "70-74", "75-79")
-  
-  # Update total person-types calculation
-  total_combinations <- length(genders) × length(races) × length(ages)
-}
-```
+# Training and saving
+cca_models <- train_lm_models(data$cca, "CCA")
+lyl_models <- train_lm_models(data$lyl, "LYL")
+cd_models <- train_lm_models(data$cd, "CD")
 
-#### 2. Update UI Components
-```r
-# Add corresponding sliders/inputs for new categories
-# Update validation logic for new percentage constraints
-# Modify weight calculation algorithms
-```
+models <- list(cca = cca_models, lyl = lyl_models, cd = cd_models)
+saveRDS(models, "models_linear_regression.rds")
 
-### Adding New Outcomes
-
-#### 1. Prepare Training Data
-```r
-# Add new CSV file: edited_INFORMS[new_outcome]_averages_combined.csv
-# Update data loading logic in training_data() reactive
-```
-
-#### 2. Extend Model Training
-```r
-# Add training for new outcome in train_models_with_progress()
-new_outcome_models <- switch(model_type,
-                            "Linear Regression" = train_lm_models(data$new_outcome, "NEW", progress_callback),
-                            # ... for all model types
-                            )
-```
-
-#### 3. Update Results Display
-```r
-# Modify results structure to include new outcome
-# Update comparison table columns
-# Extend download functionality
-```
-
-### Performance Tuning
-
-#### Model-Specific Optimizations
-```r
-# Random Forest tuning:
-ntree = 50          # Reduce for speed, increase for accuracy
-tuneLength = 2      # Reduce for speed, increase for optimization
-
-# Cross-validation tuning:
-number = 3          # Reduce for speed, increase for robustness
-repeats = 1         # Add repeats for more stable estimates
-
-# Grid search tuning:
-tuneGrid = expand.grid(alpha = c(0.1, 1), 
-                      lambda = 10^seq(-2, 0, length = 3))  # Reduce grid size
-```
-
-#### Memory Optimization
-```r
-# Large population handling:
-if (population > 500000) {
-  # Use simpler models automatically
-  # Implement progress chunking
-  # Add memory monitoring
+# Loading
+load_precomputed_model <- function(model_type) {
+  filename <- switch(model_type,
+    "Linear Regression" = "models_linear_regression.rds",
+    "Decision Tree" = "models_decision_tree.rds",
+    # ...
+  )
+  readRDS(filename)
 }
 ```
 
 ---
 
-## Development Notes
+## Core Algorithms
 
-### Code Structure Principles
-- **Modularity**: Each function has single responsibility
-- **Error Resilience**: Graceful handling of edge cases
-- **Performance**: Caching and optimization throughout
-- **Maintainability**: Clear naming and documentation
+### Demographic Weighting Algorithm
 
-### Testing Recommendations
-- Unit tests for core functions
-- Integration tests for model training
-- Performance benchmarks for optimization
-- User acceptance testing for UI workflows
+The weighting system distributes the total population across 180 person-specific models based on demographic composition:
 
-### Future Enhancements
-- Parallel model training for large populations
-- Additional demographic stratifications
-- Real-time model performance monitoring
-- Advanced visualization capabilities
+```r
+compute_demographic_weights <- function(scenario_inputs) {
+  # Step 1: Convert percentages to proportions
+  gender <- c(
+    male = scenario_inputs$male_pct / 100,
+    female = scenario_inputs$female_pct / 100
+  )
+  race <- c(
+    white = scenario_inputs$white_pct / 100,
+    black = scenario_inputs$black_pct / 100,
+    other = scenario_inputs$other_pct / 100
+  )
+  age <- c(
+    "45-49" = scenario_inputs$age_45_49 / 100,
+    "50-54" = scenario_inputs$age_50_54 / 100,
+    # ... all age groups
+  )
+  
+  # Step 2: Initialize weight vector (180 elements)
+  weights_vec <- numeric(180)
+  
+  # Step 3: Iterate through all demographic combinations
+  for (g in names(gender)) {
+    for (r in names(race)) {
+      for (a in names(age)) {
+        # Calculate sub-population size
+        subpop <- total_pop * gender[g] * race[r] * age[a]
+        
+        # Find matching persons in mapping_df
+        matches <- mapping_df %>%
+          filter(Gender == g, Race == r, AgeGroup == a)
+        
+        # Distribute sub-population equally among matching persons
+        if (nrow(matches) > 0) {
+          per_capita <- subpop / nrow(matches)
+          weights_vec[matches$P_values] <- 
+            weights_vec[matches$P_values] + per_capita
+        }
+      }
+    }
+  }
+  
+  return(round(weights_vec, 2))
+}
+```
+
+**Example Calculation**:
+```
+Total Population: 100,000
+Male: 49%, Female: 51%
+White: 60%, Black: 13%, Other: 27%
+Age 45-49: 17%, Age 50-54: 17%, etc.
+
+Sub-population (Male, White, 45-49):
+= 100,000 × 0.49 × 0.60 × 0.17
+= 4,998 persons
+
+This sub-population maps to 5 persons in mapping_df
+Each person gets: 4,998 / 5 = 999.6 persons
+```
+
+### Prediction Aggregation Algorithm
+
+```r
+predict_total <- function(models, input_data, weights) {
+  # Step 1: Generate predictions for all 180 persons
+  predictions <- sapply(paste0("P_", 1:180), function(person) {
+    model <- models[[person]]
+    pred <- safe_model_predict(model, input_data)
+    return(pred)
+  })
+  
+  # Step 2: Weight predictions by demographic distribution
+  weighted_total <- sum(predictions * weights, na.rm = TRUE)
+  
+  # Step 3: Round to appropriate precision
+  return(round(weighted_total, 2))
+}
+
+# Applied to each outcome:
+cca_total <- predict_total(trained_models$cca, input_data, weights)
+lyl_total <- predict_total(trained_models$lyl, input_data, weights)
+cd_total <- predict_total(trained_models$cd, input_data, weights)
+```
+
+### Safe Prediction Wrapper
+
+```r
+safe_model_predict <- function(model, newdata) {
+  tryCatch({
+    if (inherits(model, "lm")) {
+      predict(model, newdata = newdata)
+    } else if (inherits(model, "train")) {
+      predict(model, newdata = newdata)
+    } else {
+      0  # Fallback for dummy models
+    }
+  }, error = function(e) {
+    0  # Return 0 on any prediction error
+  })
+}
+```
+
+---
+
+## Demographic Weighting System
+
+### Mapping Logic
+
+The system uses a deterministic mapping that assigns 5 consecutive persons to each demographic combination:
+
+```r
+create_mapping_df <- function() {
+  genders <- c("male", "female")
+  races <- c("white", "black", "other")
+  ages <- c("45-49", "50-54", "55-59", "60-64", "65-69", "70-74")
+  
+  # Create all 36 combinations (2 × 3 × 6)
+  combinations <- expand.grid(
+    Gender = genders,
+    Race = races,
+    AgeGroup = ages,
+    stringsAsFactors = FALSE
+  )
+  
+  # Assign P_values sequentially
+  # P_1 to P_5: Male, White, 45-49
+  # P_6 to P_10: Male, White, 50-54
+  # ...
+  # P_176 to P_180: Female, Other, 70-74
+  combinations$P_values <- rep(1:180, length.out = nrow(combinations))
+  
+  return(combinations)
+}
+```
+
+### Weight Distribution Example
+
+For a population with specific demographics:
+
+```
+Population: 1,000,000
+Demographics:
+- Male: 49% (490,000)
+- Female: 51% (510,000)
+- White: 60% (600,000)
+- Black: 13% (130,000)
+- Other: 27% (270,000)
+- Age 45-49: 17% (170,000)
+
+Sub-population (Male, White, 45-49):
+= 1,000,000 × 0.49 × 0.60 × 0.17 = 49,980 persons
+
+Mapped to persons P_1 through P_5:
+Each person weight = 49,980 / 5 = 9,996
+
+When predicting outcomes:
+- P_1 predicts: 45.2 cases
+- P_2 predicts: 46.1 cases
+- P_3 predicts: 44.8 cases
+- P_4 predicts: 45.5 cases
+- P_5 predicts: 45.3 cases
+
+Weighted contribution from this sub-population:
+= (45.2 + 46.1 + 44.8 + 45.5 + 45.3) × 9,996
+= 226.9 × 9,996
+= 2,268,597 cases (for this demographic group)
+```
+
+---
+
+## Validation Logic
+
+### Parameter Validation
+
+#### Screening Parameter Constraints
+
+The validation system enforces logical temporal relationships:
+
+```r
+validate_screening_parameters <- function(
+  fit_before, fit_during, fit_after,
+  colon_before, colon_during, colon_after,
+  diag_before, diag_during, diag_after
+) {
+  errors <- c()
+  
+  # Rule: Before < After < During (for all screening types)
+  
+  # FIT validation
+  if (fit_before >= fit_during) {
+    errors <- c(errors, "FIT Before must be less than FIT During")
+  }
+  if (fit_after >= fit_during) {
+    errors <- c(errors, "FIT After must be less than FIT During")
+  }
+  if (fit_before >= fit_after) {
+    errors <- c(errors, "FIT Before must be less than FIT After")
+  }
+  
+  # Similar logic for COLON and DIAG parameters...
+  
+  return(errors)
+}
+```
+
+**Valid Example**:
+```
+FIT Before: 8%  →  FIT After: 9%  →  FIT During: 10%  ✓
+```
+
+**Invalid Example**:
+```
+FIT Before: 8%  →  FIT After: 11%  →  FIT During: 10%  ✗
+(After > During violates constraint)
+```
+
+#### Demographic Validation
+
+```r
+# Gender validation
+gender_total <- male_pct + female_pct
+if (gender_total != 100) {
+  show_error("Gender percentages must sum to 100%")
+}
+
+# Race validation
+race_total <- white_pct + black_pct + other_pct
+if (race_total != 100) {
+  show_error("Race percentages must sum to 100%")
+}
+
+# Age validation
+age_total <- age_45_49 + age_50_54 + age_55_59 + 
+             age_60_64 + age_65_69 + age_70_74
+if (age_total != 100) {
+  show_error("Age group percentages must sum to 100%")
+}
+```
+
+### Sub-Population Validation
+
+For multi-population analysis:
+
+```r
+validate_subpopulations <- function(subpop_data, input_mode, total_population) {
+  errors <- c()
+  
+  # Check for empty names
+  empty_names <- which(is.na(subpop_data$name) | subpop_data$name == "")
+  if (length(empty_names) > 0) {
+    errors <- c(errors, paste("Sub-population", empty_names, 
+                              "must have a name"))
+  }
+  
+  # Check for duplicate names
+  if (any(duplicated(subpop_data$name))) {
+    errors <- c(errors, "Sub-population names must be unique")
+  }
+  
+  if (input_mode == "percent") {
+    # Percentage mode: must sum to 100%
+    total_percent <- sum(subpop_data$value, na.rm = TRUE)
+    if (abs(total_percent - 100) > 0.01) {
+      errors <- c(errors, paste("Total percentages must equal 100%.",
+                                "Current total:", total_percent, "%"))
+    }
+  } else {
+    # Absolute mode: must sum to total population
+    total_absolute <- sum(subpop_data$value, na.rm = TRUE)
+    if (total_absolute != total_population) {
+      errors <- c(errors, paste("Total counts must equal total population.",
+                                "Current:", total_absolute,
+                                "Expected:", total_population))
+    }
+  }
+  
+  return(list(valid = length(errors) == 0, errors = errors))
+}
+```
+
+---
+
+## Performance Optimization
+
+### Model Caching Strategy
+
+```r
+# Initialize cache
+model_cache <- reactiveVal(list())
+
+# Cache key generation
+cache_key <- paste(model_type, digest::digest(data), sep = "_")
+
+# Check cache before training
+cached_models <- model_cache()
+if (!is.null(cached_models[[cache_key]])) {
+  return(cached_models[[cache_key]])
+}
+
+# After training, store in cache
+cached_models[[cache_key]] <- trained_models
+model_cache(cached_models)
+```
+
+### Pre-computed Models
+
+Pre-computing models dramatically improves performance:
+
+**Without Pre-computed Models**:
+- Linear Regression: 30-60 seconds
+- Random Forest: 2-3 minutes
+- SVR: 2-4 minutes
+
+**With Pre-computed Models**:
+- All models: 5-10 seconds (loading from disk)
+
+### Debouncing Baseline Calculations
+
+To prevent excessive recalculation when users adjust sliders:
+
+```r
+# Create debounced reactive
+baseline_trigger <- debounce(baseline_inputs_reactive, 1000)
+
+# Only recalculate after 1 second of inactivity
+observeEvent(baseline_trigger(), {
+  # Recalculate baseline
+})
+```
+
+### Progress Tracking
+
+```r
+withProgress(message = 'Training models...', value = 0, {
+  progress_callback <- function(progress, detail) {
+    incProgress(progress/3, detail = detail)
+  }
+  
+  # CCA models
+  setProgress(0, detail = "Training Cancer Cases models...")
+  cca_models <- train_lm_models(data$cca, "CCA", progress_callback)
+  
+  # LYL models
+  setProgress(0.33, detail = "Training Life Years Lost models...")
+  lyl_models <- train_lm_models(data$lyl, "LYL", progress_callback)
+  
+  # CD models
+  setProgress(0.66, detail = "Training Cancer Deaths models...")
+  cd_models <- train_lm_models(data$cd, "CD", progress_callback)
+})
+```
+
+---
+
+## API Reference
+
+### Core Functions
+
+#### data_prep()
+```r
+data_prep(file_path, outcome_name)
+
+Parameters:
+  file_path (character): Path to CSV file
+  outcome_name (character): Name for outcome column (CCA, LYL, or CD)
+
+Returns:
+  data.frame: Long-format data with Person and Outcome columns
+
+Example:
+  cca_data <- data_prep("cancer_cases.csv", "CCA")
+```
+
+#### create_mapping_df()
+```r
+create_mapping_df()
+
+Returns:
+  data.frame: Mapping of 180 persons to demographic groups
+  
+Columns:
+  - Gender: "male" or "female"
+  - Race: "white", "black", or "other"
+  - AgeGroup: "45-49", "50-54", ..., "70-74"
+  - P_values: 1 to 180
+```
+
+#### compute_demographic_weights()
+```r
+compute_demographic_weights(scenario_inputs)
+
+Parameters:
+  scenario_inputs (list): Contains demographic percentages and total population
+
+Returns:
+  numeric vector (length 180): Weight for each person
+
+Example:
+  weights <- compute_demographic_weights(list(
+    total_pop = 100000,
+    male_pct = 49,
+    female_pct = 51,
+    # ... other demographics
+  ))
+```
+
+#### validate_screening_parameters()
+```r
+validate_screening_parameters(
+  fit_before, fit_during, fit_after,
+  colon_before, colon_during, colon_after,
+  diag_before, diag_during, diag_after
+)
+
+Returns:
+  character vector: Error messages (empty if valid)
+
+Example:
+  errors <- validate_screening_parameters(8, 10, 9, 48, 55, 52, 7, 10, 8)
+  if (length(errors) > 0) {
+    print(errors)
+  }
+```
+
+### Model Training Functions
+
+All model training functions follow this signature:
+
+```r
+train_*_models(data, outcome, progress_callback = NULL)
+
+Parameters:
+  data (data.frame): Training data in long format
+  outcome (character): "CCA", "LYL", or "CD"
+  progress_callback (function): Optional callback for progress updates
+
+Returns:
+  list: Named list of 180 trained models (P_1 through P_180)
+
+Available functions:
+  - train_lm_models()
+  - train_tree_models()
+  - train_rf_models()
+  - train_svr_models()
+  - train_lasso_models()
+  - train_ridge_models()
+```
+
+### Prediction Functions
+
+#### safe_model_predict()
+```r
+safe_model_predict(model, newdata)
+
+Parameters:
+  model: Trained model object
+  newdata (data.frame): Input data for prediction
+
+Returns:
+  numeric: Predicted value (0 on error)
+
+Features:
+  - Handles multiple model types (lm, train)
+  - Error-safe with fallback to 0
+  - Prevents application crashes from model failures
+```
+
+---
+
+## Database Schema
+
+While the application doesn't use a traditional database, it manages data through structured objects:
+
+### In-Memory Data Structures
+
+#### Reactive Values
+```r
+# Single population
+scenario_results <- reactiveVal(list())
+scenario_names <- reactiveVal(c("Scenario 1", ...))
+model_cache <- reactiveVal(list())
+demographics_visible <- reactiveVal(TRUE)
+baseline_computing <- reactiveVal(FALSE)
+
+# Multi-population
+subpop_definitions <- reactiveVal(data.frame())
+subpops_validated <- reactiveVal(FALSE)
+subpop_results <- reactiveVal(list())
+subpop_states <- reactiveValues()
+```
+
+#### Results Storage Schema
+```r
+results <- list(
+  baseline = list(
+    cca = 12345.67,
+    lyl = 54321.98,
+    cd = 987.65,
+    model_type = "Linear Regression",
+    total_pop = 100000,
+    scenario_name = "Usual Care (Baseline)",
+    parameters = list(
+      total_pop = 100000,
+      male_pct = 49,
+      female_pct = 51,
+      white_pct = 60,
+      black_pct = 13,
+      other_pct = 27,
+      age_45_49 = 17,
+      age_50_54 = 17,
+      age_55_59 = 16,
+      age_60_64 = 16,
+      age_65_69 = 16,
+      age_70_74 = 18,
+      fit_before = 8,
+      fit_during = 8,
+      fit_after = 8,
+      colon_before = 48,
+      colon_during = 48,
+      colon_after = 48,
+      diag_before = 7,
+      diag_during = 7,
+      diag_after = 7,
+      model_type = "Linear Regression"
+    )
+  ),
+  scenario_1 = list(...),
+  scenario_2 = list(...)
+)
+```
+
+### Export Data Format
+
+CSV exports include all parameters and results:
+
+```
+Scenario_Name,Model_Type,Total_Population,Cancer_Cases,Life_Years_Lost,
+Cancer_Deaths,Male_Percent,Female_Percent,White_Percent,Black_Percent,
+Other_Race_Percent,Age_45_49_Percent,Age_50_54_Percent,Age_55_59_Percent,
+Age_60_64_Percent,Age_65_69_Percent,Age_70_74_Percent,FIT_Before,
+FIT_During,FIT_After,Colonoscopy_Before,Colonoscopy_During,
+Colonoscopy_After,Diagnostic_Before,Diagnostic_During,Diagnostic_After,
+Analysis_Date,Scenario_Type
+```
+
+---
+
+## Deployment Guide
+
+### Local Deployment
+
+#### Development Environment
+```r
+# Install dependencies
+install.packages(c("shiny", "readr", "dplyr", "tidyr", "purrr", 
+                   "caret", "glmnet", "DT", "shinyBS", "digest",
+                   "randomForest", "e1071", "rpart", "kernlab"))
+
+# Run application
+shiny::runApp("path/to/app.R")
+```
+
+#### Production Environment
+```r
+# Run on specific host and port
+shiny::runApp("app.R", host = "0.0.0.0", port = 3838)
+```
+
+### Shiny Server Deployment
+
+1. **Install Shiny Server**
+```bash
+sudo apt-get install gdebi-core
+wget https://download3.rstudio.org/ubuntu-18.04/x86_64/shiny-server-1.5.20.1002-amd64.deb
+sudo gdebi shiny-server-1.5.20.1002-amd64.deb
+```
+
+2. **Deploy Application**
+```bash
+sudo mkdir /srv/shiny-server/colorectal-cancer-metamodel
+sudo cp -R /path/to/app/* /srv/shiny-server/colorectal-cancer-metamodel/
+sudo chown -R shiny:shiny /srv/shiny-server/colorectal-cancer-metamodel
+```
+
+3. **Configure Shiny Server** (`/etc/shiny-server/shiny-server.conf`)
+```
+server {
+  listen 3838;
+  
+  location /colorectal-cancer-metamodel {
+    app_dir /srv/shiny-server/colorectal-cancer-metamodel;
+    log_dir /var/log/shiny-server;
+    
+    # Increase timeouts for long-running computations
+    app_idle_timeout 300;
+    app_init_timeout 120;
+  }
+}
+```
+
+4. **Restart Server**
+```bash
+sudo systemctl restart shiny-server
+```
+
+### Docker Deployment
+
+**Dockerfile**:
+```dockerfile
+FROM rocker/shiny:4.3.0
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    libxml2-dev \
+    libcurl4-openssl-dev
+
+# Install R packages
+RUN R -e "install.packages(c('shiny', 'readr', 'dplyr', 'tidyr', 'purrr', \
+    'caret', 'glmnet', 'DT', 'shinyBS', 'digest', \
+    'randomForest', 'e1071', 'rpart', 'kernlab'))"
+
+# Copy application files
+COPY app.R /srv/shiny-server/
+COPY *.csv /srv/shiny-server/
+COPY *.rds /srv/shiny-server/
+
+# Expose port
+EXPOSE 3838
+
+# Run application
+CMD ["R", "-e", "shiny::runApp('/srv/shiny-server/app.R', host='0.0.0.0', port=3838)"]
+```
+
+**Build and Run**:
+```bash
+docker build -t colorectal-cancer-metamodel .
+docker run -p 3838:3838 colorectal-cancer-metamodel
+```
+
+### Cloud Deployment (shinyapps.io)
+
+```r
+# Install rsconnect
+install.packages("rsconnect")
+
+# Configure account
+rsconnect::setAccountInfo(
+  name = "your-account",
+  token = "your-token",
+  secret = "your-secret"
+)
+
+# Deploy application
+rsconnect::deployApp(
+  appDir = "path/to/app",
+  appName = "colorectal-cancer-metamodel",
+  forceUpdate = TRUE
+)
+```
+
+### Performance Tuning
+
+#### Memory Optimization
+```r
+# Limit concurrent users
+options(shiny.maxRequestSize = 100*1024^2)  # 100 MB max upload
+
+# Control worker processes
+options(shiny.sanitize.errors = FALSE)
+```
+
+#### Caching Strategy
+```r
+# Use memoise for expensive operations
+library(memoise)
+cached_train_models <- memoise(train_models_with_progress)
+```
+
+#### Load Balancing
+For high-traffic deployments, use multiple Shiny Server instances behind a load balancer (nginx, HAProxy).
+
+---
+
+## Troubleshooting
+
+### Common Technical Issues
+
+#### Memory Issues
+**Symptom**: Application crashes with large populations
+**Solution**: 
+- Increase server RAM
+- Use pre-computed models
+- Implement pagination for results
+
+#### Model Loading Failures
+**Symptom**: "Model training failed" errors
+**Solution**:
+- Check data file integrity
+- Verify sufficient data points for model type
+- Use fallback to Linear Regression
+
+#### Network Timeouts
+**Symptom**: Application unresponsive during long computations
+**Solution**:
+- Increase app_idle_timeout in Shiny Server config
+- Implement asynchronous processing
+- Add progress indicators
+
+#### Data File Issues
+**Symptom**: "File not found" errors
+**Solution**:
+- Verify CSV files are in correct directory
+- Check file permissions
+- Validate CSV format and column names
+
+---
+
+## Version History
+
+### Version 1.0.0
+- Initial release
+- Single and multi-population analysis
+- Six ML model options
+- Pre-computed model support
+- Comprehensive validation
+- Enhanced export capabilities
+
+---
+
+## Contributing to Technical Documentation
+
+When contributing code changes, please update this documentation:
+
+1. **New Functions**: Add to API Reference
+2. **Algorithm Changes**: Update Core Algorithms section
+3. **Data Structure Changes**: Update Data Structures section
+4. **Performance Improvements**: Document in Performance Optimization
+5. **Bug Fixes**: Add to Troubleshooting section
+
+---
+
+## References
+
+- [Shiny Documentation](https://shiny.rstudio.com/)
+- [caret Package Guide](https://topepo.github.io/caret/)
+- [Random Forest Theory](https://www.stat.berkeley.edu/~breiman/RandomForests/)
+- [Support Vector Machines](https://scikit-learn.org/stable/modules/svm.html)
+- [Regularization in Regression](https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html)
+
+---
+
+*Last Updated: 2025-10-31*
