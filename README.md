@@ -1,274 +1,278 @@
-# Metamodel Decision Tool for Estimating Colorectal Cancer Health Outcomes
+# Metamodel Decision Tool for Colorectal Cancer Health Outcomes
 
-A comprehensive R Shiny application for analyzing the impact of different screening scenarios on colorectal cancer health outcomes using machine learning models.
-
-## 📋 Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Data Requirements](#data-requirements)
-- [Model Types](#model-types)
-- [Output Analysis](#output-analysis)
-- [File Structure](#file-structure)
-- [Contributing](#contributing)
-- [License](#license)
+A sophisticated Shiny application for analyzing and comparing colorectal cancer screening scenarios using machine learning metamodels. This tool enables healthcare researchers and policymakers to evaluate the impact of different screening strategies on cancer cases, life years lost, and cancer deaths across diverse populations.
 
 ## 🎯 Overview
 
-This tool enables healthcare researchers and policymakers to model the impact of colorectal cancer screening interventions by comparing different scenarios. The application uses metamodeling techniques to predict three key health outcomes:
-- **Cancer Cases Avoided (CCA)**
-- **Life Years Lost (LYL)**  
-- **Cancer Deaths (CD)**
+The Metamodel Decision Tool provides:
+- **Single and Multi-Population Analysis**: Analyze outcomes for a single population or compare multiple sub-populations simultaneously
+- **Multiple ML Models**: Choose from 6 different machine learning approaches (Linear Regression, Decision Tree, Random Forest, SVR, Lasso, Ridge)
+- **Scenario Comparison**: Compare up to 5 different screening scenarios side-by-side
+- **Demographic Weighting**: Account for population demographics (gender, race, age groups)
+- **Comprehensive Outputs**: Export detailed analyses with all parameters and results
 
-The tool is particularly designed to analyze the effects of COVID-19 disruptions on screening programs and evaluate recovery strategies.
+## ✨ Key Features
 
-## ✨ Features
+### Analysis Modes
+- **Single Population Analysis**: Focused analysis for a single target population
+- **Multi-Population Comparative Analysis**: Compare outcomes across multiple sub-populations with different characteristics
 
-### 🔧 Core Functionality
-- **Automated Baseline Generation**: Automatically creates a "Usual Care" baseline scenario
-- **Multi-Scenario Comparison**: Compare up to 5 intervention scenarios simultaneously
-- **6 Machine Learning Models**: Choose from Linear Regression, Decision Tree, Random Forest, SVR, Lasso, and Ridge Regression
-- **Demographic Modeling**: Comprehensive population demographics (gender, race, age groups)
-- **Parameter Validation**: Real-time validation of screening parameter relationships
+### Machine Learning Models
+- Linear Regression (fastest, ~30 seconds - 1 minute)
+- Decision Tree (~1-2 minutes)
+- Random Forest (~2-3 minutes)
+- Support Vector Regression (~2-4 minutes)
+- Lasso Regression (~1-2 minutes)
+- Ridge Regression (~1-2 minutes)
 
-### 📊 Analysis Features
-- **Interactive Results Table**: Real-time comparison of all scenarios
-- **Comprehensive Downloads**: Full parameter documentation for reproducibility
-- **Progress Tracking**: Visual progress indicators for model training
-- **Model Caching**: Intelligent caching to avoid retraining identical models
+### Screening Parameters
+Configure three types of screening interventions:
+- **FIT (Fecal Immunochemical Test)**: Range 0-30%
+- **Colonoscopy**: Range 30-70%
+- **Diagnostic Screening**: Range 0-90%
 
-### 🎨 User Experience
-- **Intuitive Workflow**: Global configuration → Scenario setup → Analysis
-- **Smart Defaults**: U.S. Census demographic defaults with one-click application
-- **Tooltips & Validation**: Extensive help text and parameter validation
-- **Responsive Design**: Works across different screen sizes
+Each with Before/During/After time periods.
 
-## 🚀 Installation
+### Demographics
+Customizable population demographics:
+- **Gender**: Male/Female distribution
+- **Race**: White/Black/Other distribution
+- **Age Groups**: 45-49, 50-54, 55-59, 60-64, 65-69, 70-74
 
-### Prerequisites
+### Health Outcomes
+The tool predicts three key health outcomes:
+- **Cancer Cases (CCA)**: Total number of colorectal cancer cases
+- **Life Years Lost (LYL)**: Total life years lost due to colorectal cancer
+- **Cancer Deaths (CD)**: Total number of cancer-related deaths
+
+## 📋 Prerequisites
+
+### System Requirements
+- R (version 4.0.0 or higher)
+- RStudio (recommended)
+- Minimum 8GB RAM (16GB recommended for larger populations)
+- 2GB free disk space
+
+### Required R Packages
 ```r
-# Required R packages
 install.packages(c(
   "shiny",
-  "readr", 
+  "readr",
   "dplyr",
   "tidyr",
   "purrr",
   "caret",
   "glmnet",
   "DT",
-  "shinyBS"
+  "shinyBS",
+  "digest",
+  "randomForest",
+  "e1071",
+  "rpart",
+  "kernlab"
 ))
 ```
 
-### Setup
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/colorectal-cancer-screening-tool.git
-   cd colorectal-cancer-screening-tool
-   ```
+### Required Data Files
+The application requires three CSV training data files:
+1. `edited_INFORMScancer_after_averages_combined.csv` - Cancer cases training data
+2. `edited_INFORMSlife_years_averages_combined.csv` - Life years lost training data
+3. `edited_INFORMScancer_death_averages_combined.csv` - Cancer deaths training data
 
-2. **Prepare your data files** (see [Data Requirements](#data-requirements))
+### Pre-computed Model Files (Optional but Recommended)
+For faster performance, pre-computed model files should be placed in the application directory:
+- `models_linear_regression.rds`
+- `models_decision_tree.rds`
+- `models_random_forest.rds`
+- `models_support_vector_regression.rds`
+- `models_lasso_regression.rds`
+- `models_ridge_regression.rds`
 
-3. **Run the application**
-   ```r
-   # In R console
-   shiny::runApp("app.R")
-   ```
+## 🚀 Installation
 
-## 📖 Usage
-
-### Step 1: Global Configuration
-1. **Set Population Size**: Enter total population for analysis (minimum 1,000)
-2. **Choose Model Type**: Select machine learning model for all scenarios
-3. **Configure Baseline Parameters**: Set pre-COVID screening rates
-4. **Set Demographics**: Configure population demographics or use Census defaults
-
-### Step 2: Scenario Setup
-1. **Choose Number of Scenarios**: Select 1-5 comparison scenarios
-2. **Name Your Scenarios**: Give meaningful names (e.g., "Enhanced Outreach", "Budget Option")
-3. **Configure Each Scenario**: Set during-COVID and post-COVID screening parameters
-
-### Step 3: Analysis
-1. **Automatic Baseline**: Baseline scenario generates automatically
-2. **Run Scenarios**: Click "Run Prediction" for each comparison scenario
-3. **Review Results**: Compare outcomes in the results table
-4. **Download Analysis**: Get comprehensive parameter documentation
-
-### Example Workflow
-```
-Global Setup:
-├── Population: 100,000
-├── Model: Random Forest
-├── FIT Before: 8%
-├── Colonoscopy Before: 48%
-└── Demographics: Census defaults
-
-Scenario 1 - "Enhanced Recovery":
-├── FIT During: 12% → After: 10%
-├── Colonoscopy During: 60% → After: 55%
-└── Results: Compare vs baseline
+### Method 1: Clone Repository
+```bash
+git clone https://github.com/yourusername/colorectal-cancer-metamodel.git
+cd colorectal-cancer-metamodel
 ```
 
-## 📁 Data Requirements
+### Method 2: Download ZIP
+1. Download the repository as a ZIP file
+2. Extract to your desired location
+3. Navigate to the directory
 
-### Required Files
-Place these CSV files in your app directory:
+### Setup Steps
+1. Ensure all required R packages are installed
+2. Place the three required CSV data files in the application directory
+3. (Optional) Place pre-computed model files in the application directory for faster performance
+4. Open `app.R` in RStudio
 
-1. **`edited_INFORMScancer_after_averages_combined.csv`**
-   - Cancer cases avoided data
-   - 180 person-types (P_1 to P_180)
-   - 9 screening parameter columns
+## 🎮 Quick Start
 
-2. **`edited_INFORMSlife_years_averages_combined.csv`**
-   - Life years lost data
-   - Same structure as cancer cases file
+### Running the Application
 
-3. **`edited_INFORMScancer_death_averages_combined.csv`**
-   - Cancer deaths data
-   - Same structure as cancer cases file
+#### In RStudio:
+```r
+# Set working directory to application folder
+setwd("path/to/colorectal-cancer-metamodel")
 
-### File Format
-```
-Column Structure:
-- FIT_before, FIT_during, FIT_after
-- COLON_before, COLON_during, COLON_after  
-- DIAG_before, DIAG_during, DIAG_after
-- P_1, P_2, ..., P_180 (person-type outcomes)
+# Run the application
+shiny::runApp()
 ```
 
-### Person-Type Mapping
-The 180 person-types represent all combinations of:
-- **Gender**: Male, Female (2 categories)
-- **Race**: White, Black, Other (3 categories)  
-- **Age Groups**: 45-49, 50-54, 55-59, 60-64, 65-69, 70-74 (6 categories)
-- **Total**: 2 × 3 × 6 = 36 combinations × 5 replicates = 180 person-types
-
-## 🤖 Model Types
-
-| Model | Best For | Training Time | Interpretability |
-|-------|----------|---------------|------------------|
-| **Linear Regression** | Quick analysis, baseline | Fast (15s) | High |
-| **Decision Tree** | Rule-based insights | Medium (45s) | High |
-| **Random Forest** | Robust predictions | Long (90s) | Medium |
-| **Support Vector Regression** | Complex patterns | Longest (120s) | Low |
-| **Lasso Regression** | Feature selection | Medium (60s) | Medium |
-| **Ridge Regression** | Regularized linear | Medium (50s) | Medium |
-
-*Training times are estimates for 100K population*
-
-## 📈 Output Analysis
-
-### Results Table
-- **Real-time Comparison**: All scenarios vs baseline
-- **Formatted Numbers**: Comma-separated for readability
-- **Color Coding**: Baseline highlighted in yellow
-
-### Comprehensive Download
-The CSV download includes:
-
-#### Results Section
-- Cancer Cases, Life Years Lost, Cancer Deaths
-- Model type and population size
-
-#### Complete Parameters  
-- All demographic distributions
-- All screening parameters (before/during/after)
-- Analysis metadata and timestamps
-
-#### Summary Statistics
-- Automatic calculation of differences from baseline
-- Separate section for easy analysis
-
-### Example Output Structure
-```
-Scenario_Name,Model_Type,Cancer_Cases,Life_Years_Lost,Cancer_Deaths,
-Male_Percent,Female_Percent,White_Percent,Black_Percent,Other_Race_Percent,
-Age_45_49_Percent,...,FIT_Before_COVID,FIT_During_COVID,FIT_After_COVID,...
-
-Usual Care (Baseline),Random Forest,2540,15420,850,49,51,60,13,27,17,17,16,16,16,18,8,8,8,48,48,48,7,7,7
-Enhanced Recovery,Random Forest,2380,14200,780,49,51,60,13,27,17,17,16,16,16,18,8,12,10,48,60,55,7,10,8
-DIFFERENCE: Enhanced Recovery vs Baseline,Random Forest,-160,-1220,-70,...
+#### From Command Line:
+```r
+R -e "shiny::runApp('path/to/app.R')"
 ```
 
-## 📂 File Structure
+### Basic Workflow
+
+#### Single Population Analysis:
+1. **Configure Global Settings**
+   - Set total population size
+   - Select machine learning model type
+   - Set baseline screening parameters (FIT, COLON, DIAG before values)
+   - Configure demographics (optional but recommended)
+
+2. **Set Up Scenarios**
+   - Choose number of scenarios (1-5)
+   - Name your scenarios
+   - Configure During/After parameters for each scenario
+
+3. **Run Analysis**
+   - Click "Run Prediction" for each scenario
+   - Wait for model loading and prediction (time varies by model)
+   - Review results in the comparison table
+
+4. **Export Results**
+   - Click "Download Comprehensive Analysis" to export all results
+
+#### Multi-Population Analysis:
+1. **Define Sub-Populations**
+   - Set total population
+   - Choose number of sub-populations (2-10)
+   - Define each sub-population by percentage or absolute numbers
+   - Validate sub-populations
+
+2. **Configure Each Sub-Population**
+   - Expand each sub-population panel
+   - Set specific parameters and demographics
+   - Configure scenarios for each sub-population
+   - Run predictions
+
+3. **Review Comprehensive Results**
+   - Individual Results: View all sub-population results
+   - Cross-Population Comparison: Compare baseline rates
+   - Aggregated Analysis: See overall totals
+   - Summary Statistics: Review statistical summaries
+
+4. **Export Multi-Population Analysis**
+   - Download complete multi-population analysis with all details
+
+## 📊 Example Use Case
+
+### Scenario: Evaluating Enhanced Screening in Urban vs Rural Populations
+
+**Objective**: Compare the impact of enhanced FIT screening across urban and rural populations.
+
+**Setup**:
+- Total Population: 500,000
+- Sub-Population 1 (Urban): 350,000 (70%)
+- Sub-Population 2 (Rural): 150,000 (30%)
+
+**Baseline (Both Populations)**:
+- FIT: 8%, Colonoscopy: 48%, Diagnostic: 7%
+
+**Enhanced Screening Scenario**:
+- FIT During: 15%, FIT After: 12%
+- Colonoscopy During: 55%, Colonoscopy After: 52%
+- Diagnostic During: 12%, Diagnostic After: 10%
+
+**Expected Outputs**:
+- Baseline cancer cases, life years lost, and deaths for each population
+- Impact of enhanced screening on each population
+- Per-capita rates for cross-population comparison
+- Aggregated totals across both populations
+
+## 📁 Project Structure
 
 ```
-colorectal-cancer-screening-tool/
-├── app.R                                           # Main Shiny application
-├── README.md                                       # This file
-├── data/
-│   ├── edited_INFORMScancer_after_averages_combined.csv
-│   ├── edited_INFORMSlife_years_averages_combined.csv
-│   └── edited_INFORMScancer_death_averages_combined.csv
-├── docs/
-│   ├── user_guide.md                              # Detailed user guide
-│   └── technical_documentation.md                 # Technical specifications
-└── examples/
-    ├── sample_analysis.csv                        # Example output
-    └── demo_scenarios.md                          # Example scenarios
+colorectal-cancer-metamodel/
+├── app.R                                          # Main Shiny application
+├── README.md                                      # This file
+├── technical_documentation.md                     # Detailed technical documentation
+├── user_guide.md                                  # Comprehensive user guide
+├── edited_INFORMScancer_after_averages_combined.csv
+├── edited_INFORMSlife_years_averages_combined.csv
+├── edited_INFORMScancer_death_averages_combined.csv
+├── models_linear_regression.rds                   # (Optional)
+├── models_decision_tree.rds                       # (Optional)
+├── models_random_forest.rds                       # (Optional)
+├── models_support_vector_regression.rds           # (Optional)
+├── models_lasso_regression.rds                    # (Optional)
+└── models_ridge_regression.rds                    # (Optional)
 ```
 
-## 🔧 Advanced Features
+## 🔧 Troubleshooting
 
-### Parameter Validation Rules
-- **FIT**: Before < During, After < During, Before < After
-- **Colonoscopy**: Before < During, After < During, Before < After  
-- **Diagnostic**: Before < During, After < During, Before < After
+### Common Issues
 
-### Model Caching
-- Automatically caches trained models
-- Avoids retraining identical configurations
-- Significant time savings for repeated analyses
+**Issue**: "File not found" error
+- **Solution**: Ensure all three CSV data files are in the application directory
 
-### Error Handling
-- Graceful handling of missing data files
-- Fallback dummy models for insufficient data
-- Clear error messages and notifications
+**Issue**: Models take too long to load
+- **Solution**: Use pre-computed model files (.rds) for faster loading
 
-## 🤝 Contributing
+**Issue**: Application crashes with large populations
+- **Solution**: Increase available RAM or reduce population size
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+**Issue**: Validation errors for demographics
+- **Solution**: Ensure all demographic percentages sum to exactly 100%
 
-### Development Setup
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Issue**: Parameter validation errors
+- **Solution**: Verify Before < After < During relationships for all screening parameters
 
-### Reporting Issues
-Please use the [GitHub Issues](https://github.com/yourusername/colorectal-cancer-screening-tool/issues) page to report bugs or request features.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 📧 Contact
+
+For questions, issues, or inquiries:
+- Email: srikarsai.puppala@gmail.com
+
+## 🙏 Acknowledgments
+
+- Based on INFORMS cancer screening research
+- Built with R Shiny framework
+- Machine learning models powered by caret, randomForest, e1071, and glmnet packages
 
 ## 📚 Citation
 
 If you use this tool in your research, please cite:
 
-```bibtex
-@software{colorectal_screening_tool,
-  title={Metamodel Decision Tool for Estimating Colorectal Cancer Health Outcomes},
-  author={Sai Srikar Puppala},
-  year={2025},
-  url={https://github.com/puppalasaisrikar/colorectal-cancer-screening-tool}
-}
+```
+Sai Srikar Puppala, North Carolina State University. (2025). Metamodel Decision Tool for Colorectal Cancer Health Outcomes. 
+GitHub repository: https://github.com/ashleystanfield/ColorectalCancerMetamodels
 ```
 
-## 🙏 Acknowledgments
+## 🔄 Version History
 
-- Built with [R Shiny](https://shiny.rstudio.com/)
-- Machine learning models powered by [caret](https://topepo.github.io/caret/)
-- UI components from [shinyBS](https://github.com/ebailey78/shinyBS)
+### Version 1.0.0 (Current)
+- Single and multi-population analysis modes
+- Six machine learning model options
+- Comprehensive demographic weighting
+- Enhanced validation and error handling
+- Detailed export capabilities
+- Pre-computed model support
 
-## 📞 Support
+## 🚦 Status
 
-- **Documentation**: Check the [User Guide](user_guide.md) & [Technical Documentation](technical_documentation.md)
-- **Email**: srikarsai.puppala@gmail.com
+![Status](https://img.shields.io/badge/status-active-success.svg)
+![R Version](https://img.shields.io/badge/R-4.0%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ---
 
-**Last Updated**: August 2025  
+**Note**: This tool is designed for research and policy analysis purposes. Clinical decisions should involve consultation with healthcare professionals and consideration of individual patient circumstances.
