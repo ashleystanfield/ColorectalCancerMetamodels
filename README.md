@@ -2,20 +2,24 @@
 
 A sophisticated Shiny application for analyzing and comparing colorectal cancer screening scenarios using machine learning metamodels. This tool enables healthcare researchers and policymakers to evaluate the impact of different screening strategies on cancer cases, life years lost, and cancer deaths across diverse populations.
 
-## 🎯 Overview
+## Background
+
+The NC-CRC simulation model is a validated, agent-based model designed to simulate the natural history and screening of colorectal cancer (CRC). It comprises three primary components: (1) adenoma (polyp) incidence and growth, (2) progression through precancerous and cancerous disease states, and (3) screening and surveillance dynamics. The model accepts population-level inputs, including demographic distributions and screening participation rates before, during, and after a five-year intervention period. It simulates individual life histories and produces detailed health outcomes, such as cancer after, cancer death, and life-years lost. Simulation outputs are used to generate metamodels that approximate the NC-CRC model's behavior and can be interfaced with via this metamodel decision tool. To train these metamodels, we simulated diverse combinations of screening levels with 5,000 stochastic replications per individual type in the base population. Each individual is characterized by age, race, and gender, enabling estimation of both individual-level and population-level outcomes.
+
+## Overview
 
 The Metamodel Decision Tool provides:
-- **Single and Multi-Population Analysis**: Analyze outcomes for a single population or compare multiple sub-populations simultaneously
-- **Multiple ML Models**: Choose from 6 different machine learning approaches (Linear Regression, Decision Tree, Random Forest, SVR, Lasso, Ridge)
-- **Scenario Comparison**: Compare up to 5 different screening scenarios side-by-side
-- **Demographic Weighting**: Account for population demographics (gender, race, age groups)
-- **Comprehensive Outputs**: Export detailed analyses with all parameters and results
+- Single and Multi-Population Analysis: Analyze outcomes for a single population or compare multiple sub-populations simultaneously
+- Multiple ML Models: Choose from 6 different machine learning approaches (Linear Regression, Decision Tree, Random Forest, SVR, Lasso, Ridge)
+- Scenario Comparison: Compare up to 5 different screening scenarios side-by-side
+- Demographic Weighting: Account for population demographics (gender, race, age groups)
+- Comprehensive Outputs: Export detailed analyses with all parameters and results
 
-## ✨ Key Features
+## Key Features
 
 ### Analysis Modes
-- **Single Population Analysis**: Focused analysis for a single target population
-- **Multi-Population Comparative Analysis**: Compare outcomes across multiple sub-populations with different characteristics
+- Single Population Analysis: Focused analysis for a single target population
+- Multi-Population Comparative Analysis: Compare outcomes across multiple sub-populations with different characteristics
 
 ### Machine Learning Models
 - Linear Regression (fastest, ~30 seconds - 1 minute)
@@ -26,26 +30,31 @@ The Metamodel Decision Tool provides:
 - Ridge Regression (~1-2 minutes)
 
 ### Screening Parameters
-Configure three types of screening interventions:
-- **FIT (Fecal Immunochemical Test)**: Range 0-30%
-- **Colonoscopy**: Range 30-70%
-- **Diagnostic Screening**: Range 0-90%
+Configure three types of screening interventions. Note: The tool assumes that screening levels follow the relationship: Before ≤ After ≤ During for parameter validation.
 
-Each with Before/During/After time periods.
+- **FIT (Fecal Immunochemical Test)**: Range 0%-30%. FIT screening levels represent the probability that an individual who is not up to date screens with FIT each year.
+- **Routine Colonoscopy**: Range 30%-70%. Routine Colonoscopy screening levels represent the 10-year probability that an individual gets a routine colonoscopy.
+- **Diagnostic (Follow-Up) Colonoscopy**: Range 0%-90%. Diagnostic Colonoscopy screening levels represent the probability an individual with a positive FIT test will get a diagnostic colonoscopy within a year of positive FIT test.
+
+Each screening parameter can be configured for Before/During/After time periods.
 
 ### Demographics
-Customizable population demographics:
-- **Gender**: Male/Female distribution
-- **Race**: White/Black/Other distribution
-- **Age Groups**: 45-49, 50-54, 55-59, 60-64, 65-69, 70-74
+Customizable population demographics allow users to specify the distribution of the population across demographic categories. The tool assumes that individuals are uniformly distributed within each demographic category specified. Users can define:
+
+- **Gender**: Distribution across Male/Female categories (percentages must sum to 100%)
+- **Race**: Distribution across White/Black/Other categories (percentages must sum to 100%)
+- **Age Eligible Groups**: Distribution across age bands: 45-49, 50-54, 55-59, 60-64, 65-69, 70-74 (percentages must sum to 100%). We assume that individuals are uniformly distributed within each age group.
+
+The tool weights predictions according to these demographic distributions to provide population-level estimates. All demographic percentages for each category (gender, race, age) must sum to exactly 100% for validation to pass.
 
 ### Health Outcomes
 The tool predicts three key health outcomes:
-- **Cancer Cases (CCA)**: Total number of colorectal cancer cases
-- **Life Years Lost (LYL)**: Total life years lost due to colorectal cancer
-- **Cancer Deaths (CD)**: Total number of cancer-related deaths
 
-## 📋 Prerequisites
+- **Cancer Cases (CC)**: Probability that an individual gets cancer after the intervention. (Note: Simulation model outputs are binary, whether or not cancer occurred. Metamodels estimate the average across 5,000 replications of binary outcomes to obtain a probability.)
+- **Life Years Lost (LYL)**: The difference between how long an individual would have lived according to the life tables and how long they actually lived if they died of colorectal cancer. (Note: Metamodels estimate the average LYL across 5,000 replications)
+- **Cancer Deaths (CD)**: Probability that an individual dies of colorectal cancer after the intervention. (Note: Simulation model outputs are binary, whether or not death by cancer occurred. Metamodels estimate the average across 5,000 replications of binary outcomes to obtain a probability.)
+
+## Prerequisites
 
 ### System Requirements
 - R (version 4.0.0 or higher)
@@ -88,7 +97,7 @@ For faster performance, pre-computed model files should be placed in the applica
 - `models_lasso_regression.rds`
 - `models_ridge_regression.rds`
 
-## 🚀 Installation
+## Installation
 
 ### Method 1: Clone Repository
 ```bash
@@ -107,7 +116,7 @@ cd colorectal-cancer-metamodel
 3. (Optional) Place pre-computed model files in the application directory for faster performance
 4. Open `app.R` in RStudio
 
-## 🎮 Quick Start
+## Quick Start
 
 ### Running the Application
 
@@ -169,7 +178,7 @@ R -e "shiny::runApp('path/to/app.R')"
 4. **Export Multi-Population Analysis**
    - Download complete multi-population analysis with all details
 
-## 📊 Example Use Case
+## Example Use Case
 
 ### Scenario: Evaluating Enhanced Screening in Urban vs Rural Populations
 
@@ -194,7 +203,7 @@ R -e "shiny::runApp('path/to/app.R')"
 - Per-capita rates for cross-population comparison
 - Aggregated totals across both populations
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 colorectal-cancer-metamodel/
@@ -213,7 +222,7 @@ colorectal-cancer-metamodel/
 └── models_ridge_regression.rds                    # (Optional)
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -230,25 +239,25 @@ colorectal-cancer-metamodel/
 - **Solution**: Ensure all demographic percentages sum to exactly 100%
 
 **Issue**: Parameter validation errors
-- **Solution**: Verify Before < After < During relationships for all screening parameters
+- **Solution**: Verify Before ≤ After ≤ During relationships for all screening parameters
 
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📧 Contact
+## Contact
 
 For questions, issues, or inquiries:
 - Email: srikarsai.puppala@gmail.com
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Based on INFORMS cancer screening research
 - Built with R Shiny framework
 - Machine learning models powered by caret, randomForest, e1071, and glmnet packages
 
-## 📚 Citation
+## Citation
 
 If you use this tool in your research, please cite:
 
@@ -257,7 +266,7 @@ Sai Srikar Puppala, North Carolina State University. (2025). Metamodel Decision 
 GitHub repository: https://github.com/ashleystanfield/ColorectalCancerMetamodels
 ```
 
-## 🔄 Version History
+## Version History
 
 ### Version 1.0.0 (Current)
 - Single and multi-population analysis modes
@@ -267,7 +276,7 @@ GitHub repository: https://github.com/ashleystanfield/ColorectalCancerMetamodels
 - Detailed export capabilities
 - Pre-computed model support
 
-## 🚦 Status
+## Status
 
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 ![R Version](https://img.shields.io/badge/R-4.0%2B-blue.svg)
